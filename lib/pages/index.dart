@@ -15,7 +15,8 @@ class _IndexPageState extends State<IndexPage> {
   List<SmsMessage> smsList = [];
   String searchWords = '';
   bool isSelectMode = false;
-  var selectedIds = <int, bool>{};
+  Map<int, bool> selectedIds = {};
+  int? pressedId;
 
   final controller = TextEditingController();
   final SmsQuery smsQuery = SmsQuery();
@@ -163,8 +164,17 @@ class _IndexPageState extends State<IndexPage> {
         );
       }
 
+      Color color = theme.colorScheme.surface;
+      if (selectedIds[msg.id] ?? false) {
+        color = Colors.grey[200]!;
+      }
+      if (pressedId == msg.id) {
+        color = Colors.grey[300]!;
+      }
+
       return GestureDetector(
         child: Container(
+          color: color,
           margin: const EdgeInsets.only(top: 10, bottom: 10),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -176,6 +186,31 @@ class _IndexPageState extends State<IndexPage> {
           setState(() {
             selectedIds[msg.id!] = true;
             isSelectMode = true;
+          });
+        },
+        onTap: () {
+          if (isSelectMode) {
+            setState(() {
+              selectedIds[msg.id!] = !(selectedIds[msg.id!] ?? false);
+            });
+            return;
+          }
+
+          Navigator.pushNamed(context, "/detail", arguments: msg);
+        },
+        onTapDown: (details) {
+          setState(() {
+            pressedId = msg.id;
+          });
+        },
+        onTapUp: (details) {
+          setState(() {
+            pressedId = null;
+          });
+        },
+        onTapCancel: () {
+          setState(() {
+            pressedId = null;
           });
         },
       );
