@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:sms_advanced/sms_advanced.dart';
+import 'package:smsman/common/extension.dart';
 
 import '/common/logger.dart';
 
@@ -71,11 +72,11 @@ class _IndexPageState extends State<IndexPage> {
       vertical: 10,
     );
 
-    PreferredSizeWidget? appBar;
-
     var isNotSelectAll =
         selectedIds.values.length != smsList.length ||
         selectedIds.values.any((selected) => !selected);
+
+    PreferredSizeWidget appBar = AppBar(actionsPadding: actionsPadding);
 
     if (isSelectMode) {
       appBar = AppBar(
@@ -119,7 +120,61 @@ class _IndexPageState extends State<IndexPage> {
       );
     }
 
+    var addressTextStyle = TextStyle(fontWeight: FontWeight.w500, fontSize: 16);
     var list = smsList.map((msg) {
+      var address = Text(msg.address!, style: addressTextStyle);
+      var body = Text(
+        msg.body!,
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(color: Colors.grey[600]),
+      );
+      if (searchWords.isNotEmpty) {
+        if (msg.address!.contains(searchWords)) {
+          var highlightText = TextSpan(
+            text: searchWords,
+            style: addressTextStyle.copyWith(color: Colors.green),
+          );
+          var texts = msg.address!
+              .split(searchWords)
+              .where((s) => s.isNotEmpty)
+              .map((s) => TextSpan(text: s, style: addressTextStyle))
+              .toList()
+              .insertBetween(highlightText);
+          if (msg.address!.startsWith(searchWords)) {
+            texts.insert(0, highlightText);
+          }
+          if (msg.address!.endsWith(searchWords)) {
+            texts.add(highlightText);
+          }
+          address = Text.rich(TextSpan(children: texts));
+        }
+
+        if (msg.body!.contains(searchWords)) {
+          var highlightText = TextSpan(
+            text: searchWords,
+            style: body.style!.copyWith(color: Colors.green),
+          );
+          var texts = msg.body!
+              .split(searchWords)
+              .where((s) => s.isNotEmpty)
+              .map((s) => TextSpan(text: s, style: body.style))
+              .toList()
+              .insertBetween(highlightText);
+          if (msg.body!.startsWith(searchWords)) {
+            texts.insert(0, highlightText);
+          }
+          if (msg.body!.endsWith(searchWords)) {
+            texts.add(highlightText);
+          }
+          body = Text.rich(
+            TextSpan(children: texts),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          );
+        }
+      }
+
       var children = [
         Padding(
           padding: const EdgeInsets.only(right: 8.0),
@@ -131,22 +186,14 @@ class _IndexPageState extends State<IndexPage> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    msg.address!,
-                    style: TextStyle(fontWeight: FontWeight.w500, fontSize: 16),
-                  ),
+                  address,
                   Text(
                     formatDate(msg.date!),
                     style: TextStyle(color: Colors.grey[600]),
                   ),
                 ],
               ),
-              Text(
-                msg.body!,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(color: Colors.grey[600]),
-              ),
+              body,
             ],
           ),
         ),
@@ -175,7 +222,7 @@ class _IndexPageState extends State<IndexPage> {
       return GestureDetector(
         child: Container(
           color: color,
-          margin: const EdgeInsets.only(top: 10, bottom: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -228,6 +275,7 @@ class _IndexPageState extends State<IndexPage> {
       }
     }
 
+    var buttomNavigatorBarSize = MediaQuery.sizeOf(context).height / 12;
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, result) async {
@@ -247,47 +295,77 @@ class _IndexPageState extends State<IndexPage> {
         }
       },
       child: Scaffold(
-        appBar: appBar ?? AppBar(actionsPadding: actionsPadding),
-        body: Padding(
-          padding: const EdgeInsets.only(top: 20, right: 20, left: 20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
+        appBar: appBar,
+        body: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              height: 60,
+              padding: const EdgeInsets.only(left: 20, right: 20, top: 20),
+              child: Text(
                 headText,
                 style: theme.textTheme.headlineLarge!.copyWith(
                   fontWeight: FontWeight.w600,
                 ),
               ),
-              Container(
-                margin: const EdgeInsets.only(top: 15, bottom: 15),
-                child: TextField(
-                  controller: controller,
-                  decoration: InputDecoration(
-                    prefixIcon: const Icon(Icons.search),
-                    suffixIcon: searchWords.isNotEmpty
-                        ? IconButton(
-                            icon: const Icon(Icons.clear),
-                            onPressed: controller.clear,
-                          )
-                        : null,
-                    hintText: '搜索',
-                    isDense: true,
-                    filled: true,
-                    fillColor: Colors.grey[200],
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: BorderSide.none,
-                    ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+              child: TextField(
+                controller: controller,
+                decoration: InputDecoration(
+                  prefixIcon: const Icon(Icons.search),
+                  suffixIcon: searchWords.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear),
+                          onPressed: controller.clear,
+                        )
+                      : null,
+                  hintText: '搜索',
+                  isDense: true,
+                  filled: true,
+                  fillColor: Colors.grey[200],
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide.none,
                   ),
                 ),
               ),
-              Expanded(
-                child: Scrollbar(child: ListView(children: list)),
-              ),
-            ],
-          ),
+            ),
+            Expanded(
+              child: Scrollbar(child: ListView(children: list)),
+            ),
+          ],
         ),
+        bottomNavigationBar: isSelectMode
+            ? BottomAppBar(
+                color: theme.colorScheme.surface,
+                height: buttomNavigatorBarSize,
+                padding: EdgeInsets.only(left: 20, right: 20),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    SizedBox.shrink(),
+                    SizedBox(
+                      height: buttomNavigatorBarSize,
+                      width: buttomNavigatorBarSize,
+                      child: InkWell(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.delete_forever_outlined),
+                            Text('删除', style: theme.textTheme.bodySmall),
+                          ],
+                        ),
+                        onTap: () {
+                          // TODO: 添加点击处理逻辑
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            : null,
       ),
     );
   }
