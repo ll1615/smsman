@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:sms_advanced/sms_advanced.dart';
+import 'package:smsman/common/logger.dart';
 
 class DetailPage extends StatelessWidget {
   const DetailPage({super.key});
@@ -8,7 +9,10 @@ class DetailPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     SmsMessage msg = ModalRoute.of(context)!.settings.arguments as SmsMessage;
-    var theme = Theme.of(context);
+    logger.d('id: ${msg.id}, threadId: ${msg.threadId}');
+    ThemeData theme = Theme.of(context);
+    double screenHeight = MediaQuery.of(context).size.height;
+    double screenWidth = MediaQuery.of(context).size.width;
 
     return PopScope(
       canPop: false,
@@ -24,11 +28,38 @@ class DetailPage extends StatelessWidget {
           backgroundColor: Colors.grey[200],
           title: Text(msg.address!),
           actions: [
-            IconButton(
-              icon: Icon(Icons.more_vert_sharp),
-              onPressed: () {
-                // TODO:
+            PopupMenuButton(
+              onSelected: (item) async {
+                if (item == MenuItem.delete) {
+                  var result = await SmsRemover().removeSmsById(
+                    msg.id!,
+                    msg.threadId!,
+                  );
+                  logger.d('result: $result');
+                  if (context.mounted) {
+                    Navigator.pop(context, result);
+                  }
+                }
               },
+              color: theme.colorScheme.surface,
+              icon: Icon(Icons.more_vert),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.all(Radius.circular(10.0)),
+              ),
+              constraints: BoxConstraints.tightFor(width: screenWidth * 0.4),
+              position: PopupMenuPosition.under,
+              itemBuilder: (context) => [
+                PopupMenuItem(
+                  value: MenuItem.delete,
+                  child: Container(
+                    padding: const EdgeInsets.only(left: 10),
+                    child: Text(
+                      '删除',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
@@ -72,3 +103,5 @@ class DetailPage extends StatelessWidget {
     return DateFormat('M月d日 HH:mm').format(date);
   }
 }
+
+enum MenuItem { delete }

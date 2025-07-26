@@ -18,12 +18,11 @@ class _IndexPageState extends State<IndexPage> {
   String searchWords = '';
   bool isSelectMode = false;
   Map<int, bool> selectedIds = {};
-  int? pressedId;
 
   final controller = TextEditingController();
   final SmsQuery smsQuery = SmsQuery();
 
-  void observer() {
+  void observer() async {
     var current = controller.text.trim();
     if (current == searchWords) {
       return;
@@ -64,6 +63,8 @@ class _IndexPageState extends State<IndexPage> {
 
   @override
   Widget build(BuildContext context) {
+    logger.d('building');
+
     var theme = Theme.of(context);
 
     var textButtonStyle = TextButton.styleFrom(
@@ -219,12 +220,9 @@ class _IndexPageState extends State<IndexPage> {
       if (selectedIds[msg.id] ?? false) {
         color = Colors.grey[200]!;
       }
-      if (pressedId == msg.id) {
-        color = Colors.grey[300]!;
-      }
 
-      return GestureDetector(
-        child: Container(
+      return InkWell(
+        child: Ink(
           color: color,
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
           child: Row(
@@ -239,7 +237,7 @@ class _IndexPageState extends State<IndexPage> {
             isSelectMode = true;
           });
         },
-        onTap: () {
+        onTap: () async {
           if (isSelectMode) {
             setState(() {
               selectedIds[msg.id!] = !(selectedIds[msg.id!] ?? false);
@@ -248,22 +246,15 @@ class _IndexPageState extends State<IndexPage> {
           }
 
           FocusManager.instance.primaryFocus?.unfocus();
-          Navigator.pushNamed(context, "/detail", arguments: msg);
-        },
-        onTapDown: (details) {
-          setState(() {
-            pressedId = msg.id;
-          });
-        },
-        onTapUp: (details) {
-          setState(() {
-            pressedId = null;
-          });
-        },
-        onTapCancel: () {
-          setState(() {
-            pressedId = null;
-          });
+          var result = await Navigator.pushNamed(
+            context,
+            "/detail",
+            arguments: msg,
+          );
+          if (result != null && (result as bool)) {
+            // TODO:
+            logger.d('删除成功!');
+          }
         },
       );
     }).toList();
@@ -350,7 +341,7 @@ class _IndexPageState extends State<IndexPage> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceAround,
                   children: [
-                    SizedBox.shrink(),
+                    const SizedBox.shrink(),
                     SizedBox(
                       height: buttomNavigatorBarSize,
                       width: buttomNavigatorBarSize,
@@ -358,7 +349,7 @@ class _IndexPageState extends State<IndexPage> {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.delete_forever_outlined),
+                            const Icon(Icons.delete_forever_outlined),
                             Text('删除', style: theme.textTheme.bodySmall),
                           ],
                         ),
