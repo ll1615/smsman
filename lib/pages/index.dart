@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:sms_advanced/sms_advanced.dart';
-import 'package:smsman/common/extension.dart';
 
-import '/common/logger.dart';
+import '../common/common.dart';
+import '../common/extension.dart';
+import '../common/logger.dart';
 
 class IndexPage extends StatefulWidget {
   const IndexPage({super.key});
@@ -22,21 +23,24 @@ class _IndexPageState extends State<IndexPage> {
   final controller = TextEditingController();
   final SmsQuery smsQuery = SmsQuery();
 
+  void observer() {
+    var current = controller.text.trim();
+    if (current == searchWords) {
+      return;
+    }
+
+    selectedIds.clear();
+    searchWords = current;
+    getAllSms();
+  }
+
   @override
   void initState() {
     super.initState();
 
     // 监听输入框
-    controller.addListener(() {
-      var current = controller.text.trim();
-      if (current == searchWords) {
-        return;
-      }
-
-      selectedIds.clear();
-      searchWords = current;
-      getAllSms();
-    });
+    var listener = debounce(Duration(milliseconds: 500), observer);
+    controller.addListener(listener);
 
     getAllSms();
   }
@@ -243,6 +247,7 @@ class _IndexPageState extends State<IndexPage> {
             return;
           }
 
+          FocusManager.instance.primaryFocus?.unfocus();
           Navigator.pushNamed(context, "/detail", arguments: msg);
         },
         onTapDown: (details) {
