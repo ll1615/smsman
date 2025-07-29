@@ -1,7 +1,9 @@
+import 'package:easy_refresh/easy_refresh.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:sms_advanced/sms_advanced.dart';
 
+import '../common/loading.dart';
 import '../common/common.dart';
 import '../common/extension.dart';
 import '../common/logger.dart';
@@ -30,7 +32,8 @@ class _IndexPageState extends State<IndexPage> {
 
     selectedIds.clear();
     searchWords = current;
-    getAllSms();
+
+    loadingCall(context, getSmsList);
   }
 
   @override
@@ -39,11 +42,9 @@ class _IndexPageState extends State<IndexPage> {
 
     // 监听输入框
     controller.addListener(debounce(Duration(milliseconds: 500), observer));
-
-    getAllSms();
   }
 
-  Future<void> getAllSms() async {
+  Future<List<SmsMessage>> getSmsList() async {
     List<SmsMessage> messages = await smsQuery.querySms();
     if (searchWords.isNotEmpty) {
       messages = messages
@@ -58,6 +59,8 @@ class _IndexPageState extends State<IndexPage> {
     setState(() {
       smsList = messages;
     });
+
+    return messages;
   }
 
   @override
@@ -123,7 +126,14 @@ class _IndexPageState extends State<IndexPage> {
               ),
             ),
             Expanded(
-              child: Scrollbar(child: ListView(children: _buildListView())),
+              child: Scrollbar(
+                child: EasyRefresh(
+                  header: const MaterialHeader(),
+                  onRefresh: getSmsList,
+                  refreshOnStart: true,
+                  child: ListView(children: _buildListView()),
+                ),
+              ),
             ),
           ],
         ),
