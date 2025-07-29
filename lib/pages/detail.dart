@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:sms_advanced/sms_advanced.dart';
-import 'package:smsman/common/logger.dart';
+
+import '../common/logger.dart';
 
 class DetailPage extends StatelessWidget {
   const DetailPage({super.key});
@@ -35,16 +36,15 @@ class DetailPage extends StatelessWidget {
                     msg.id!,
                     msg.threadId!,
                   );
-                  logger.d('result: $result');
                   if (context.mounted) {
                     Navigator.pop(context, result);
                   }
                 }
               },
               color: theme.colorScheme.surface,
-              icon: Icon(Icons.more_vert),
+              icon: const Icon(Icons.more_vert),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.all(Radius.circular(10.0)),
+                borderRadius: const BorderRadius.all(Radius.circular(10.0)),
               ),
               constraints: BoxConstraints.tightFor(width: screenWidth * 0.4),
               position: PopupMenuPosition.under,

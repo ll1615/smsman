@@ -38,13 +38,12 @@ class _IndexPageState extends State<IndexPage> {
     super.initState();
 
     // 监听输入框
-    var listener = debounce(Duration(milliseconds: 500), observer);
-    controller.addListener(listener);
+    controller.addListener(debounce(Duration(milliseconds: 500), observer));
 
     getAllSms();
   }
 
-  getAllSms() async {
+  Future<void> getAllSms() async {
     List<SmsMessage> messages = await smsQuery.querySms();
     if (searchWords.isNotEmpty) {
       messages = messages
@@ -63,122 +62,110 @@ class _IndexPageState extends State<IndexPage> {
 
   @override
   Widget build(BuildContext context) {
-    logger.d('building');
+    logger.i('building...');
 
     var theme = Theme.of(context);
 
-    var textButtonStyle = TextButton.styleFrom(
-      foregroundColor: Colors.green,
-      textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-    );
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) {
+          return;
+        }
 
-    var actionsPadding = const EdgeInsets.symmetric(
-      horizontal: 10,
-      vertical: 10,
-    );
-
-    var isNotSelectAll =
-        selectedIds.values.length != smsList.length ||
-        selectedIds.values.any((selected) => !selected);
-
-    PreferredSizeWidget appBar = AppBar(actionsPadding: actionsPadding);
-
-    if (isSelectMode) {
-      appBar = AppBar(
-        actionsPadding: actionsPadding,
-        actions: [
-          Expanded(
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                TextButton(
-                  style: textButtonStyle,
-                  onPressed: () => {
-                    setState(() {
-                      selectedIds.clear();
-                      isSelectMode = false;
-                    }),
-                  },
-                  child: Text('取消'),
+        if (isSelectMode) {
+          setState(() {
+            selectedIds.clear();
+            isSelectMode = false;
+          });
+          return;
+        }
+        if (mounted) {
+          SystemNavigator.pop();
+        }
+      },
+      child: Scaffold(
+        appBar: _buildAppBar(),
+        body: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              height: 60,
+              padding: const EdgeInsets.only(left: 20, right: 20, top: 20),
+              child: Text(
+                _getHeaderText(),
+                style: theme.textTheme.headlineLarge!.copyWith(
+                  fontWeight: FontWeight.w600,
                 ),
-                TextButton(
-                  style: textButtonStyle,
-                  onPressed: () {
-                    if (isNotSelectAll) {
-                      setState(() {
-                        for (var msg in smsList) {
-                          selectedIds[msg.id!] = true;
-                        }
-                      });
-                    } else {
-                      setState(() {
-                        selectedIds.clear();
-                      });
-                    }
-                  },
-                  child: Text(isNotSelectAll ? '全选' : '全不选'),
-                ),
-              ],
+              ),
             ),
-          ),
-        ],
-      );
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+              child: TextField(
+                controller: controller,
+                decoration: InputDecoration(
+                  prefixIcon: const Icon(Icons.search),
+                  suffixIcon: searchWords.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear),
+                          onPressed: controller.clear,
+                        )
+                      : null,
+                  hintText: '搜索',
+                  isDense: true,
+                  filled: true,
+                  fillColor: Colors.grey[200],
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+              ),
+            ),
+            Expanded(
+              child: Scrollbar(child: ListView(children: _buildListView())),
+            ),
+          ],
+        ),
+        bottomNavigationBar: _buildBottomNavigationBar(),
+      ),
+    );
+  }
+
+  String _getHeaderText() {
+    if (!isSelectMode) {
+      return '信息';
     }
 
-    var addressTextStyle = TextStyle(fontWeight: FontWeight.w500, fontSize: 16);
-    var list = smsList.map((msg) {
-      var address = Text(msg.address!, style: addressTextStyle);
-      var body = Text(
-        msg.body!,
-        maxLines: 2,
-        overflow: TextOverflow.ellipsis,
-        style: TextStyle(color: Colors.grey[600]),
-      );
-      if (searchWords.isNotEmpty) {
-        if (msg.address!.contains(searchWords)) {
-          var highlightText = TextSpan(
-            text: searchWords,
-            style: addressTextStyle.copyWith(color: Colors.green),
-          );
-          var texts = msg.address!
-              .split(searchWords)
-              .where((s) => s.isNotEmpty)
-              .map((s) => TextSpan(text: s, style: addressTextStyle))
-              .toList()
-              .insertBetween(highlightText);
-          if (msg.address!.startsWith(searchWords)) {
-            texts.insert(0, highlightText);
-          }
-          if (msg.address!.endsWith(searchWords)) {
-            texts.add(highlightText);
-          }
-          address = Text.rich(TextSpan(children: texts));
-        }
+    var selectedCount = selectedIds.values
+        .where((selected) => selected)
+        .toList()
+        .length;
+    if (selectedCount > 0) {
+      return '已选择 $selectedCount 项';
+    }
 
-        if (msg.body!.contains(searchWords)) {
-          var highlightText = TextSpan(
-            text: searchWords,
-            style: body.style!.copyWith(color: Colors.green),
-          );
-          var texts = msg.body!
-              .split(searchWords)
-              .where((s) => s.isNotEmpty)
-              .map((s) => TextSpan(text: s, style: body.style))
-              .toList()
-              .insertBetween(highlightText);
-          if (msg.body!.startsWith(searchWords)) {
-            texts.insert(0, highlightText);
-          }
-          if (msg.body!.endsWith(searchWords)) {
-            texts.add(highlightText);
-          }
-          body = Text.rich(
-            TextSpan(children: texts),
+    return '选择信息';
+  }
+
+  List<Widget> _buildListView() {
+    var theme = Theme.of(context);
+
+    var addressTextStyle = TextStyle(fontWeight: FontWeight.w500, fontSize: 16);
+    var bodyTextStyle = TextStyle(color: Colors.grey[600]);
+
+    return smsList.map((msg) {
+      var address =
+          _buildHighlight(msg.address!, searchWords, addressTextStyle) ??
+          Text(msg.address!, style: addressTextStyle);
+      var body =
+          _buildHighlight(msg.body!, searchWords, bodyTextStyle) ??
+          Text(
+            msg.body!,
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
+            style: TextStyle(color: Colors.grey[600]),
           );
-        }
-      }
 
       var children = [
         Padding(
@@ -258,110 +245,130 @@ class _IndexPageState extends State<IndexPage> {
         },
       );
     }).toList();
+  }
 
-    var headText = '信息';
-    if (isSelectMode) {
-      headText = '选择信息';
-      var selectedCount = selectedIds.values
-          .where((selected) => selected)
-          .toList()
-          .length;
-      if (selectedCount > 0) {
-        headText = '已选择 $selectedCount 项';
-      }
+  Widget? _buildHighlight(String str, String target, TextStyle style) {
+    if (target.isEmpty || !str.contains(target)) {
+      return null;
     }
 
-    var buttomNavigatorBarSize = MediaQuery.sizeOf(context).height / 12;
-    return PopScope(
-      canPop: false,
-      onPopInvokedWithResult: (didPop, result) async {
-        if (didPop) {
-          return;
-        }
+    var highlightText = TextSpan(
+      text: target,
+      style: style.copyWith(color: Colors.green),
+    );
+    var texts = str
+        .split(target)
+        .where((s) => s.isNotEmpty)
+        .map((s) => TextSpan(text: s, style: style))
+        .toList()
+        .insertBetween(highlightText);
+    if (str.startsWith(target)) {
+      texts.insert(0, highlightText);
+    }
+    if (str.endsWith(target)) {
+      texts.add(highlightText);
+    }
 
-        if (isSelectMode) {
-          setState(() {
-            selectedIds.clear();
-            isSelectMode = false;
-          });
-          return;
-        }
-        if (mounted) {
-          SystemNavigator.pop();
-        }
-      },
-      child: Scaffold(
-        appBar: appBar,
-        body: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              height: 60,
-              padding: const EdgeInsets.only(left: 20, right: 20, top: 20),
-              child: Text(
-                headText,
-                style: theme.textTheme.headlineLarge!.copyWith(
-                  fontWeight: FontWeight.w600,
+    return Text.rich(
+      TextSpan(children: texts),
+      maxLines: 2,
+      overflow: TextOverflow.ellipsis,
+    );
+  }
+
+  bool get _isNotSelectAll {
+    return selectedIds.values.length != smsList.length ||
+        selectedIds.values.any((selected) => !selected);
+  }
+
+  PreferredSizeWidget _buildAppBar() {
+    var actionsPadding = const EdgeInsets.symmetric(
+      horizontal: 10,
+      vertical: 10,
+    );
+
+    var textButtonStyle = TextButton.styleFrom(
+      foregroundColor: Colors.green,
+      textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+    );
+
+    if (isSelectMode) {
+      return AppBar(
+        actionsPadding: actionsPadding,
+        actions: [
+          Expanded(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                TextButton(
+                  style: textButtonStyle,
+                  onPressed: () => {
+                    setState(() {
+                      selectedIds.clear();
+                      isSelectMode = false;
+                    }),
+                  },
+                  child: Text('取消'),
                 ),
+                TextButton(
+                  style: textButtonStyle,
+                  onPressed: () {
+                    if (_isNotSelectAll) {
+                      setState(() {
+                        for (var msg in smsList) {
+                          selectedIds[msg.id!] = true;
+                        }
+                      });
+                    } else {
+                      setState(() {
+                        selectedIds.clear();
+                      });
+                    }
+                  },
+                  child: Text(_isNotSelectAll ? '全选' : '全不选'),
+                ),
+              ],
+            ),
+          ),
+        ],
+      );
+    }
+
+    return AppBar(actionsPadding: actionsPadding);
+  }
+
+  Widget? _buildBottomNavigationBar() {
+    if (!isSelectMode) {
+      return null;
+    }
+
+    var theme = Theme.of(context);
+    var buttomNavigatorBarSize = MediaQuery.sizeOf(context).height / 12;
+    return BottomAppBar(
+      color: theme.colorScheme.surface,
+      height: buttomNavigatorBarSize,
+      padding: EdgeInsets.only(left: 20, right: 20),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: [
+          const SizedBox.shrink(),
+          SizedBox(
+            height: buttomNavigatorBarSize,
+            width: buttomNavigatorBarSize,
+            child: InkWell(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.delete_forever_outlined),
+                  Text('删除', style: theme.textTheme.bodySmall),
+                ],
               ),
+              onTap: () {
+                // TODO: 添加点击处理逻辑
+              },
             ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
-              child: TextField(
-                controller: controller,
-                decoration: InputDecoration(
-                  prefixIcon: const Icon(Icons.search),
-                  suffixIcon: searchWords.isNotEmpty
-                      ? IconButton(
-                          icon: const Icon(Icons.clear),
-                          onPressed: controller.clear,
-                        )
-                      : null,
-                  hintText: '搜索',
-                  isDense: true,
-                  filled: true,
-                  fillColor: Colors.grey[200],
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide: BorderSide.none,
-                  ),
-                ),
-              ),
-            ),
-            Expanded(
-              child: Scrollbar(child: ListView(children: list)),
-            ),
-          ],
-        ),
-        bottomNavigationBar: isSelectMode
-            ? BottomAppBar(
-                color: theme.colorScheme.surface,
-                height: buttomNavigatorBarSize,
-                padding: EdgeInsets.only(left: 20, right: 20),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: [
-                    const SizedBox.shrink(),
-                    SizedBox(
-                      height: buttomNavigatorBarSize,
-                      width: buttomNavigatorBarSize,
-                      child: InkWell(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(Icons.delete_forever_outlined),
-                            Text('删除', style: theme.textTheme.bodySmall),
-                          ],
-                        ),
-                        onTap: () {
-                          // TODO: 添加点击处理逻辑
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-              )
-            : null,
+          ),
+        ],
       ),
     );
   }

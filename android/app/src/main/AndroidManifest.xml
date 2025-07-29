@@ -1,6 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application
-        android:label="smsman"
+        android:label="短信管理"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
@@ -89,5 +89,6 @@
     <uses-permission android:name="android.permission.RECEIVE_MMS" />
     <uses-permission android:name="android.permission.READ_SMS" />
     <uses-permission android:name="android.permission.WRITE_SMS" />
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
 
 </manifest>
