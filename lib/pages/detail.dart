@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:sms_advanced/sms_advanced.dart';
 
+import '../common/common.dart';
 import '../common/logger.dart';
 
 class DetailPage extends StatelessWidget {
@@ -103,5 +104,3 @@ class DetailPage extends StatelessWidget {
     return DateFormat('M月d日 HH:mm').format(date);
   }
 }
-
-enum MenuItem { delete }

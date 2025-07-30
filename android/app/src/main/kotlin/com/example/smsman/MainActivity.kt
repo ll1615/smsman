@@ -85,7 +85,7 @@ class MainActivity : FlutterFragmentActivity() {
         val packageManager = packageManager
 
         // 尝试启动Android默认短信应用
-        packageManager.getLaunchIntentForPackage("com.example.smsman")?.let { intent ->
+        packageManager.getLaunchIntentForPackage("com.android.mms")?.let { intent ->
             startActivity(intent)
             return "ok"
         }

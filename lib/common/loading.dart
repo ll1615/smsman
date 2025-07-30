@@ -1,15 +1,19 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 
 Future<T> loadingCall<T>(
   BuildContext context,
   Future<T> Function() callback,
 ) async {
-  LoadingScreen.instance().show(context: context);
+  // LoadingScreen.instance().show(context: context);
+  SmartDialog.showLoading();
   try {
+    await Future.delayed(const Duration(seconds: 2));
     return await callback();
   } finally {
-    LoadingScreen.instance().hide();
+    SmartDialog.dismiss();
+    // LoadingScreen.instance().hide();
   }
 }
 

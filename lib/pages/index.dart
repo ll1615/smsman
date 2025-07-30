@@ -1,6 +1,8 @@
 import 'package:easy_refresh/easy_refresh.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:sms_advanced/sms_advanced.dart';
 
 import '../common/loading.dart';
@@ -21,11 +23,16 @@ class _IndexPageState extends State<IndexPage> {
   bool isSelectMode = false;
   Map<int, bool> selectedIds = {};
 
-  final controller = TextEditingController();
-  final SmsQuery smsQuery = SmsQuery();
+  final textController = TextEditingController();
+  final smsQuery = SmsQuery();
+  final smsRemover = SmsRemover();
+
+  Future<MethodChannel> get _platform async {
+    return MethodChannel('${await getPackageName()}/smsApp');
+  }
 
   void observer() async {
-    var current = controller.text.trim();
+    var current = textController.text.trim();
     if (current == searchWords) {
       return;
     }
@@ -41,26 +48,7 @@ class _IndexPageState extends State<IndexPage> {
     super.initState();
 
     // 监听输入框
-    controller.addListener(debounce(Duration(milliseconds: 500), observer));
-  }
-
-  Future<List<SmsMessage>> getSmsList() async {
-    List<SmsMessage> messages = await smsQuery.querySms();
-    if (searchWords.isNotEmpty) {
-      messages = messages
-          .where(
-            (msg) =>
-                msg.address!.contains(searchWords) ||
-                msg.body!.contains(searchWords),
-          )
-          .toList();
-    }
-
-    setState(() {
-      smsList = messages;
-    });
-
-    return messages;
+    textController.addListener(debounce(Duration(milliseconds: 500), observer));
   }
 
   @override
@@ -68,7 +56,6 @@ class _IndexPageState extends State<IndexPage> {
     logger.i('building...');
 
     var theme = Theme.of(context);
-
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, result) async {
@@ -105,13 +92,13 @@ class _IndexPageState extends State<IndexPage> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
               child: TextField(
-                controller: controller,
+                controller: textController,
                 decoration: InputDecoration(
                   prefixIcon: const Icon(Icons.search),
                   suffixIcon: searchWords.isNotEmpty
                       ? IconButton(
                           icon: const Icon(Icons.clear),
-                          onPressed: controller.clear,
+                          onPressed: textController.clear,
                         )
                       : null,
                   hintText: '搜索',
@@ -140,6 +127,25 @@ class _IndexPageState extends State<IndexPage> {
         bottomNavigationBar: _buildBottomNavigationBar(),
       ),
     );
+  }
+
+  Future<List<SmsMessage>> getSmsList() async {
+    List<SmsMessage> messages = await smsQuery.querySms();
+    if (searchWords.isNotEmpty) {
+      messages = messages
+          .where(
+            (msg) =>
+                msg.address!.contains(searchWords) ||
+                msg.body!.contains(searchWords),
+          )
+          .toList();
+    }
+
+    setState(() {
+      smsList = messages;
+    });
+
+    return messages;
   }
 
   String _getHeaderText() {
@@ -202,13 +208,24 @@ class _IndexPageState extends State<IndexPage> {
       ];
       if (isSelectMode) {
         children.add(
-          Checkbox(
-            value: selectedIds[msg.id] ?? false,
-            onChanged: (checked) {
-              setState(() {
-                selectedIds[msg.id!] = checked!;
-              });
-            },
+          SizedBox(
+            width: 40,
+            height: 65,
+            child: Transform.scale(
+              scale: 1.4,
+              child: Checkbox(
+                visualDensity: VisualDensity.comfortable,
+                value: selectedIds[msg.id] ?? false,
+                onChanged: (checked) {
+                  setState(() {
+                    selectedIds[msg.id!] = checked!;
+                  });
+                },
+                shape: CircleBorder(),
+                side: BorderSide(width: 2, color: Colors.grey[400]!),
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+            ),
           ),
         );
       }
@@ -344,7 +361,61 @@ class _IndexPageState extends State<IndexPage> {
       );
     }
 
-    return AppBar(actionsPadding: actionsPadding);
+    var theme = Theme.of(context);
+    double screenWidth = MediaQuery.of(context).size.width;
+    return AppBar(
+      actionsPadding: actionsPadding,
+      actions: [
+        PopupMenuButton(
+          onSelected: popupMenuSelected,
+          color: theme.colorScheme.surface,
+          icon: const Icon(Icons.more_vert),
+          shape: RoundedRectangleBorder(
+            borderRadius: const BorderRadius.all(Radius.circular(10.0)),
+          ),
+          constraints: BoxConstraints.tightFor(width: screenWidth * 0.4),
+          position: PopupMenuPosition.under,
+          itemBuilder: (context) =>
+              [
+                    (MenuItem.requestPermission, '申请短信权限'),
+                    (MenuItem.permissionSetting, '应用权限设置'),
+                    (MenuItem.setDefaultSmsApp, '设置默认短信应用'),
+                    (MenuItem.resetDefaultSmsApp, '恢复默认短信应用'),
+                  ]
+                  .map(
+                    (menu) => PopupMenuItem(
+                      value: menu.$1,
+                      child: Container(
+                        padding: const EdgeInsets.only(left: 10),
+                        child: Text(
+                          menu.$2,
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ),
+                  )
+                  .toList(),
+        ),
+      ],
+    );
+  }
+
+  popupMenuSelected(item) async {
+    switch (item) {
+      case MenuItem.requestPermission:
+        await Permission.sms.request();
+        break;
+      case MenuItem.permissionSetting:
+        await openAppSettings();
+        break;
+      case MenuItem.setDefaultSmsApp:
+        // await _setDefaultApp();
+        await (await _platform).invokeMethod<String>('setDefaultSmsApp');
+        break;
+      case MenuItem.resetDefaultSmsApp:
+        await (await _platform).invokeMethod<String>('resetDefaultSmsApp');
+        break;
+    }
   }
 
   Widget? _buildBottomNavigationBar() {
