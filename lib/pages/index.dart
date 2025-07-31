@@ -128,7 +128,7 @@ class _IndexPageState extends State<IndexPage> {
       return List.empty();
     }
 
-    List<SmsMessage> messages = await smsQuery.querySms();
+    List<SmsMessage> messages = await smsQuery.getAllSms;
     if (searchWords.isNotEmpty) {
       messages = messages
           .where(
@@ -138,6 +138,7 @@ class _IndexPageState extends State<IndexPage> {
           )
           .toList();
     }
+    messages.sort((a, b) => b.date!.compareTo(a.date!));
 
     return messages;
   }
