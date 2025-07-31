@@ -123,6 +123,11 @@ class _IndexPageState extends State<IndexPage> {
   }
 
   Future<List<SmsMessage>> getSmsList() async {
+    if (!(await Permission.sms.isGranted)) {
+      SmartDialog.showToast('无短信读取权限!');
+      return List.empty();
+    }
+
     List<SmsMessage> messages = await smsQuery.querySms();
     if (searchWords.isNotEmpty) {
       messages = messages
