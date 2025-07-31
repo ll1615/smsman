@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:intl/intl.dart';
 import 'package:sms_advanced/sms_advanced.dart';
 
@@ -30,6 +31,10 @@ class DetailPage extends StatelessWidget {
             PopupMenuButton(
               onSelected: (item) async {
                 if (item == MenuItem.delete) {
+                  if (!(await isDefaultSmsApp())) {
+                    SmartDialog.showToast('请将应用设置为默认短信应用！');
+                    return;
+                  }
                   var result = await SmsRemover().removeSmsById(
                     msg.id!,
                     msg.threadId!,

@@ -290,12 +290,22 @@ class _IndexPageState extends State<IndexPage> {
       text: target,
       style: style.copyWith(color: Colors.green),
     );
+
+    if (str == target) {
+      return Text.rich(
+        TextSpan(children: [highlightText]),
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+      );
+    }
+
     var texts = str
         .split(target)
         .where((s) => s.isNotEmpty)
         .map((s) => TextSpan(text: s, style: style))
         .toList()
         .insertBetween(highlightText);
+
     if (str.startsWith(target)) {
       texts.insert(0, highlightText);
     }
@@ -512,6 +522,11 @@ class _IndexPageState extends State<IndexPage> {
   _deleteSmsMessages() async {
     if (!(await isDefaultSmsApp())) {
       SmartDialog.showToast('请将应用设置为默认短信应用！');
+      if (mounted) Navigator.pop(context);
+      setState(() {
+        selectedIds.clear();
+        isSelectMode = false;
+      });
       return;
     }
 
@@ -524,6 +539,11 @@ class _IndexPageState extends State<IndexPage> {
         return await smsRemover.removeSmsById(msg.id!, msg.threadId!);
       });
       await Future.wait(futures);
+
+      // 全部删除，列表为空，重置搜索条件
+      if (futures.length == smsList.length) {
+        textController.text = '';
+      }
 
       var messages = await getSmsList();
       setState(() {
