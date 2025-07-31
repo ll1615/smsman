@@ -3,7 +3,6 @@ import 'package:intl/intl.dart';
 import 'package:sms_advanced/sms_advanced.dart';
 
 import '../common/common.dart';
-import '../common/logger.dart';
 
 class DetailPage extends StatelessWidget {
   const DetailPage({super.key});
@@ -11,9 +10,7 @@ class DetailPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     SmsMessage msg = ModalRoute.of(context)!.settings.arguments as SmsMessage;
-    logger.d('id: ${msg.id}, threadId: ${msg.threadId}');
     ThemeData theme = Theme.of(context);
-    double screenHeight = MediaQuery.of(context).size.height;
     double screenWidth = MediaQuery.of(context).size.width;
 
     return PopScope(

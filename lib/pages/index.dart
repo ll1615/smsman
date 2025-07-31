@@ -8,7 +8,6 @@ import 'package:sms_advanced/sms_advanced.dart';
 import '../common/loading.dart';
 import '../common/common.dart';
 import '../common/extension.dart';
-import '../common/logger.dart';
 
 class IndexPage extends StatefulWidget {
   const IndexPage({super.key});
@@ -21,15 +20,11 @@ class _IndexPageState extends State<IndexPage> {
   List<SmsMessage> smsList = [];
   String searchWords = '';
   bool isSelectMode = false;
-  Map<int, bool> selectedIds = {};
+  Map<int, SmsMessage> selectedIds = {};
 
   final textController = TextEditingController();
   final smsQuery = SmsQuery();
   final smsRemover = SmsRemover();
-
-  Future<MethodChannel> get _platform async {
-    return MethodChannel('${await getPackageName()}/smsApp');
-  }
 
   void observer() async {
     var current = textController.text.trim();
@@ -40,7 +35,7 @@ class _IndexPageState extends State<IndexPage> {
     selectedIds.clear();
     searchWords = current;
 
-    loadingCall(context, getSmsList);
+    loadingCall(updateSmsList);
   }
 
   @override
@@ -53,8 +48,6 @@ class _IndexPageState extends State<IndexPage> {
 
   @override
   Widget build(BuildContext context) {
-    logger.i('building...');
-
     var theme = Theme.of(context);
     return PopScope(
       canPop: false,
@@ -116,7 +109,7 @@ class _IndexPageState extends State<IndexPage> {
               child: Scrollbar(
                 child: EasyRefresh(
                   header: const MaterialHeader(),
-                  onRefresh: getSmsList,
+                  onRefresh: updateSmsList,
                   refreshOnStart: true,
                   child: ListView(children: _buildListView()),
                 ),
@@ -141,22 +134,24 @@ class _IndexPageState extends State<IndexPage> {
           .toList();
     }
 
+    return messages;
+  }
+
+  Future<void> updateSmsList() async {
+    var messages = await getSmsList();
+
     setState(() {
+      selectedIds.clear();
       smsList = messages;
     });
-
-    return messages;
   }
 
   String _getHeaderText() {
     if (!isSelectMode) {
-      return '信息';
+      return '信息 (${smsList.length} 项)';
     }
 
-    var selectedCount = selectedIds.values
-        .where((selected) => selected)
-        .toList()
-        .length;
+    var selectedCount = selectedIds.keys.length;
     if (selectedCount > 0) {
       return '已选择 $selectedCount 项';
     }
@@ -215,10 +210,14 @@ class _IndexPageState extends State<IndexPage> {
               scale: 1.4,
               child: Checkbox(
                 visualDensity: VisualDensity.comfortable,
-                value: selectedIds[msg.id] ?? false,
+                value: selectedIds[msg.id] != null,
                 onChanged: (checked) {
                   setState(() {
-                    selectedIds[msg.id!] = checked!;
+                    if (checked!) {
+                      selectedIds[msg.id!] = msg;
+                    } else {
+                      selectedIds.remove(msg.id!);
+                    }
                   });
                 },
                 shape: CircleBorder(),
@@ -231,7 +230,7 @@ class _IndexPageState extends State<IndexPage> {
       }
 
       Color color = theme.colorScheme.surface;
-      if (selectedIds[msg.id] ?? false) {
+      if (selectedIds[msg.id] != null) {
         color = Colors.grey[200]!;
       }
 
@@ -247,14 +246,18 @@ class _IndexPageState extends State<IndexPage> {
         ),
         onLongPress: () {
           setState(() {
-            selectedIds[msg.id!] = true;
+            selectedIds[msg.id!] = msg;
             isSelectMode = true;
           });
         },
         onTap: () async {
           if (isSelectMode) {
             setState(() {
-              selectedIds[msg.id!] = !(selectedIds[msg.id!] ?? false);
+              if (selectedIds[msg.id!] != null) {
+                selectedIds.remove(msg.id!);
+              } else {
+                selectedIds[msg.id!] = msg;
+              }
             });
             return;
           }
@@ -266,8 +269,7 @@ class _IndexPageState extends State<IndexPage> {
             arguments: msg,
           );
           if (result != null && (result as bool)) {
-            // TODO:
-            logger.d('删除成功!');
+            updateSmsList();
           }
         },
       );
@@ -304,8 +306,7 @@ class _IndexPageState extends State<IndexPage> {
   }
 
   bool get _isNotSelectAll {
-    return selectedIds.values.length != smsList.length ||
-        selectedIds.values.any((selected) => !selected);
+    return selectedIds.keys.length != smsList.length;
   }
 
   PreferredSizeWidget _buildAppBar() {
@@ -343,7 +344,7 @@ class _IndexPageState extends State<IndexPage> {
                     if (_isNotSelectAll) {
                       setState(() {
                         for (var msg in smsList) {
-                          selectedIds[msg.id!] = true;
+                          selectedIds[msg.id!] = msg;
                         }
                       });
                     } else {
@@ -367,7 +368,7 @@ class _IndexPageState extends State<IndexPage> {
       actionsPadding: actionsPadding,
       actions: [
         PopupMenuButton(
-          onSelected: popupMenuSelected,
+          onSelected: moreMenuSelected,
           color: theme.colorScheme.surface,
           icon: const Icon(Icons.more_vert),
           shape: RoundedRectangleBorder(
@@ -400,7 +401,7 @@ class _IndexPageState extends State<IndexPage> {
     );
   }
 
-  popupMenuSelected(item) async {
+  void moreMenuSelected(item) async {
     switch (item) {
       case MenuItem.requestPermission:
         await Permission.sms.request();
@@ -409,11 +410,10 @@ class _IndexPageState extends State<IndexPage> {
         await openAppSettings();
         break;
       case MenuItem.setDefaultSmsApp:
-        // await _setDefaultApp();
-        await (await _platform).invokeMethod<String>('setDefaultSmsApp');
+        await setDefaultSmsApp();
         break;
       case MenuItem.resetDefaultSmsApp:
-        await (await _platform).invokeMethod<String>('resetDefaultSmsApp');
+        await resetDefaultSmsApp();
         break;
     }
   }
@@ -424,7 +424,8 @@ class _IndexPageState extends State<IndexPage> {
     }
 
     var theme = Theme.of(context);
-    var buttomNavigatorBarSize = MediaQuery.sizeOf(context).height / 12;
+    var screenHeight = MediaQuery.sizeOf(context).height;
+    var buttomNavigatorBarSize = screenHeight / 12;
     return BottomAppBar(
       color: theme.colorScheme.surface,
       height: buttomNavigatorBarSize,
@@ -445,13 +446,87 @@ class _IndexPageState extends State<IndexPage> {
                 ],
               ),
               onTap: () {
-                // TODO: 添加点击处理逻辑
+                showModalBottomSheet(
+                  context: context,
+                  clipBehavior: Clip.antiAlias,
+                  requestFocus: false,
+                  builder: (context) {
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        InkWell(
+                          onTap: () {
+                            _deleteSmsMessages();
+                          },
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 20),
+                            child: Center(
+                              child: Text(
+                                '删除 ${selectedIds.length} 条短信',
+                                style: TextStyle(
+                                  color: Colors.red,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 17,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        Divider(height: 0, indent: 20, endIndent: 20),
+                        InkWell(
+                          onTap: () {
+                            Navigator.pop(context);
+                          },
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 20),
+                            child: Center(
+                              child: Text(
+                                '取消',
+                                style: TextStyle(
+                                  color: Colors.blue[500],
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 17,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    );
+                  },
+                );
               },
             ),
           ),
         ],
       ),
     );
+  }
+
+  _deleteSmsMessages() async {
+    if (!(await isDefaultSmsApp())) {
+      SmartDialog.showToast('请将应用设置为默认短信应用！');
+      return;
+    }
+
+    await loadingCall(() async {
+      if (mounted) {
+        Navigator.pop(context);
+      }
+
+      var futures = selectedIds.values.map((msg) async {
+        return await smsRemover.removeSmsById(msg.id!, msg.threadId!);
+      });
+      await Future.wait(futures);
+
+      var messages = await getSmsList();
+      setState(() {
+        smsList = messages;
+        isSelectMode = false;
+        selectedIds.clear();
+      });
+    });
   }
 
   String formatDate(DateTime date) {
